@@ -1,5 +1,5 @@
 /* ***************************************************
-librtmp example code
+rtmpcast: librtmp example code
 Greg Kennedy 2021
 
 Sends an input FLV file to a designated RTMP URL.
@@ -122,6 +122,10 @@ int main(int argc, char * argv[])
 		goto freeRTMP;
 	}
 
+	// track the fd for rtmp
+	int fd = RTMP_Socket(r);
+	struct timeval tv = {0, 0};
+
 	// Let's install some signal handlers for a graceful exit
 	running = 1;
 	signal(SIGTERM, sig_handler);
@@ -183,6 +187,30 @@ int main(int argc, char * argv[])
 				fputs("Failed to RTMP_Write\n", stderr);
 				ret = EXIT_FAILURE;
 				goto restoreSig;
+			}
+
+			// Handle any packets from the remote to us.
+			//  We will use select() to see if packet is waiting,
+			//  then read it and dispatch to the handler.
+			fd_set set;
+			FD_ZERO(&set);
+			FD_SET(fd, &set);
+
+			if (select(fd + 1, &set, NULL, NULL, &tv) == -1) {
+				perror("Error calling select()");
+				ret = EXIT_FAILURE;
+				goto restoreSig;
+			}
+
+			// socket is present in read-ready set, safe to call RTMP_ReadPacket
+			if (FD_ISSET(fd, &set)) {
+				RTMPPacket packet = { 0 };
+
+				if (RTMP_ReadPacket(r, &packet) && RTMPPacket_IsReady(&packet)) {
+					// this function does all the internal stuff we need
+					RTMP_ClientPacket(r, &packet);
+					RTMPPacket_Free(&packet);
+				}
 			}
 
 			// delay
