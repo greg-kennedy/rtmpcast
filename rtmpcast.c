@@ -151,13 +151,14 @@ int main(int argc, char * argv[])
 			}
 		} else {
 			// Successfully got header.  Parse it.
-			// unsigned char payloadType = tag[0];
+			unsigned char payloadType = tag[0];
 			unsigned long payloadSize = u24be(tag + 1);
-			unsigned long timestamp = u32be(tag + 4);
+			unsigned long timestamp = u24be(tag + 4) | (tag[7] << 24);
+
 			unsigned long streamId = u24be(tag + 8);
 
 			if (DEBUG)
-				printf("Position %lu, Type %hhu, Size %lu, Timestamp %lu, Stream %lu\n", ftell(flv), tag[4], payloadSize, timestamp, streamId);
+				printf("Position %lu, Type %hhu, Size %lu, Timestamp %lu, Stream %lu\n", ftell(flv), payloadType, payloadSize, timestamp, streamId);
 
 			// Read the rest of the payload.
 			if (payloadSize != fread(tag + 11, 1, payloadSize, flv)) {
